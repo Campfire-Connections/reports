@@ -1,0 +1,9 @@
+<!-- templates/reports/list_reports.html //-->
+<h1>Available Reports</h1>
+<ul>
+    {% for report in reports %}
+        <li>
+            <a href="{% url 'reports:generate_report' report.id %}">{{ report.name }}</a>
+        </li>
+    {% endfor %}
+</ul>

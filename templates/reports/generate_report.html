@@ -1,0 +1,7 @@
+<!-- templates/reports/generate_report.html //-->
+<h1>Generate Report: {{ report.name }}</h1>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Generate</button>
+</form>
