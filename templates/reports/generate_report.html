@@ -1,7 +1,13 @@
 <!-- templates/reports/generate_report.html //-->
+
+{% extends 'base/layout.html' %}
+
+{% block content %}
 <h1>Generate Report: {{ report.name }}</h1>
 <form method="post">
     {% csrf_token %}
     {{ form.as_p }}
     <button type="submit">Generate</button>
 </form>
+
+{% endblock content %}

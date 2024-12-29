@@ -1,9 +1,19 @@
 <!-- templates/reports/list_reports.html //-->
-<h1>Available Reports</h1>
+{% extends 'base/layout.html' %}
+
+{% block content %}
+<div class="container"><br /><br/><br/><br />
+<h1>Your Reports</h1>
 <ul>
     {% for report in reports %}
-        <li>
-            <a href="{% url 'reports:generate_report' report.id %}">{{ report.name }}</a>
-        </li>
+    <li>
+        {{ report.name }}
+        <a href="{% url 'reports:update_report_template' report.id %}">Edit</a>
+        <a href="{% url 'reports:generate_report' report.id %}">Generate</a>
+    </li>
     {% endfor %}
 </ul>
+<a href="{% url 'reports:create_report_template' %}">Create New Report</a>
+
+</div>
+{% endblock content %}
