@@ -2,14 +2,16 @@
 
 import json
 
-from django.urls import reverse_lazy
-from django.views.generic import ListView, CreateView, UpdateView, FormView
-from django.shortcuts import get_object_or_404
+from django.core.exceptions import PermissionDenied
+from django.db.models import Q
 from django.http import JsonResponse
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.shortcuts import get_object_or_404
+from django.urls import reverse_lazy
+from django.views.generic import CreateView, FormView, ListView, UpdateView
+from django.contrib.auth.mixins import LoginRequiredMixin
 
-from .models import ReportTemplate, GeneratedReport
-from .forms import ReportTemplateForm, ReportGenerationForm
+from .forms import ReportGenerationForm, ReportTemplateForm
+from .models import GeneratedReport, ReportTemplate
 from .utils import generate_report_output
 
 
@@ -39,9 +41,14 @@ class ListReportsView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         user = self.request.user
-        return ReportTemplate.objects.filter(
-            available_to=user
-        ) | ReportTemplate.objects.filter(created_by=user)
+        return (
+            ReportTemplate.objects.filter(
+                Q(created_by=user) | Q(available_to=user)
+            )
+            .distinct()
+            .select_related("created_by")
+            .prefetch_related("available_to")
+        )
 
 
 class CreateReportTemplateView(LoginRequiredMixin, CreateView):
@@ -99,14 +106,21 @@ class GenerateReportView(LoginRequiredMixin, FormView):
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
-        filters = form.cleaned_data.get("filters", "{}")
+        filters_raw = form.cleaned_data.get("filters") or "{}"
         output_format = form.cleaned_data["output_format"]
 
         try:
-            filters = json.loads(filters)
-            output_file = generate_report_output(self.report, filters, output_format)
+            filters = json.loads(filters_raw)
+        except json.JSONDecodeError:
+            return JsonResponse(
+                {"error": "Filters must be valid JSON."}, status=400
+            )
 
-            GeneratedReport.objects.create(
+        try:
+            output_file = generate_report_output(
+                self.report, filters, output_format
+            )
+            generated = GeneratedReport.objects.create(
                 name=self.report.name,
                 template=self.report,
                 generated_by=self.request.user,
@@ -117,7 +131,7 @@ class GenerateReportView(LoginRequiredMixin, FormView):
             return JsonResponse(
                 {
                     "message": "Report generated successfully",
-                    "file_url": output_file.url,
+                    "file_url": generated.output_file.url,
                 }
             )
         except Exception as e:
