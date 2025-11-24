@@ -7,12 +7,21 @@ from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
-from django.views.generic import CreateView, FormView, ListView, UpdateView
+from django.views.generic import (
+    CreateView,
+    FormView,
+    ListView,
+    UpdateView,
+    TemplateView,
+)
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.http import HttpResponse
+import csv
 
 from .forms import ReportGenerationForm, ReportTemplateForm
 from .models import GeneratedReport, ReportTemplate
 from .utils import generate_report_output
+from .report_registry import available_reports_for, get_report
 
 
 class ReportAccessMixin:
@@ -143,3 +152,72 @@ class GenerateReportView(LoginRequiredMixin, FormView):
         context = super().get_context_data(**kwargs)
         context["report"] = self.report
         return context
+
+
+# Built-in registry driven reports
+class BuiltinReportsIndexView(LoginRequiredMixin, TemplateView):
+    template_name = "reports/builtin_index.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["reports"] = available_reports_for(self.request.user)
+        return context
+
+
+class BuiltinReportDetailView(LoginRequiredMixin, TemplateView):
+    template_name = "reports/builtin_detail.html"
+
+    def get_filters(self):
+        params = self.request.GET
+        return {
+            "facility_slug": params.get("facility_slug") or None,
+            "faction_slug": params.get("faction_slug") or None,
+            "start": params.get("start") or None,
+            "end": params.get("end") or None,
+            "unscoped": params.get("unscoped") == "1",
+        }
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        report = get_report(kwargs["slug"])
+        filters = self.get_filters()
+        rows = list(report.get_rows(self.request.user, filters))
+        columns = [label for _, label in report.columns]
+        table_rows = [[row.get(col) for col in columns] for row in rows]
+        context.update(
+            report=report,
+            filters=filters,
+            rows=rows,
+            columns=columns,
+            table_rows=table_rows,
+        )
+        return context
+
+
+class BuiltinReportExportView(BuiltinReportDetailView):
+    """
+    Export the current report as CSV or Excel (tab-delimited).
+    """
+
+    def get(self, request, *args, **kwargs):
+        report = get_report(kwargs["slug"])
+        filters = self.get_filters()
+        rows = report.get_rows(request.user, filters)
+        fmt = kwargs.get("fmt", "csv").lower()
+        response = HttpResponse(content_type="text/csv")
+        delimiter = ","
+        if fmt == "excel":
+            delimiter = "\t"
+            response["Content-Disposition"] = (
+                f'attachment; filename="{report.slug}.xlsx"'
+            )
+        else:
+            response["Content-Disposition"] = (
+                f'attachment; filename="{report.slug}.csv"'
+            )
+
+        writer = csv.DictWriter(response, fieldnames=[label for _, label in report.columns], delimiter=delimiter)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
+        return response

@@ -1,0 +1,25 @@
+{% extends "base/list.html" %}
+{% block title_text %}Reports{% endblock title_text %}
+{% block objects_title %}Available Reports{% endblock objects_title %}
+{% block object_type %}Report{% endblock object_type %}
+
+{% block content %}
+<div class="bodyHeader clearfix d-flex justify-content-between align-items-center" style="margin-bottom:8px;">
+    <h1 class="mb-0">Reports</h1>
+</div>
+
+<div class="list-group">
+    {% for report in reports %}
+        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+           href="{% url 'reports:builtin_detail' slug=report.slug %}">
+            <div>
+                <div class="fw-bold">{{ report.name }}</div>
+                <div class="text-muted small">{{ report.description }}</div>
+            </div>
+            <span class="fas fa-chevron-right"></span>
+        </a>
+    {% empty %}
+        <p class="text-muted">No reports available.</p>
+    {% endfor %}
+</div>
+{% endblock content %}

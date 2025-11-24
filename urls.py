@@ -6,12 +6,26 @@ from .views import (
     CreateReportTemplateView,
     UpdateReportTemplateView,
     GenerateReportView,
+    BuiltinReportsIndexView,
+    BuiltinReportDetailView,
+    BuiltinReportExportView,
 )
 
 app_name = "reports"
 
 urlpatterns = [
     path("", ListReportsView.as_view(), name="list_user_reports"),
+    path("builtin/", BuiltinReportsIndexView.as_view(), name="builtin_index"),
+    path(
+        "builtin/<slug:slug>/",
+        BuiltinReportDetailView.as_view(),
+        name="builtin_detail",
+    ),
+    path(
+        "builtin/<slug:slug>/export/<str:fmt>/",
+        BuiltinReportExportView.as_view(),
+        name="builtin_export",
+    ),
     path("create/", CreateReportTemplateView.as_view(), name="create_report_template"),
     path(
         "<int:pk>/edit/",
